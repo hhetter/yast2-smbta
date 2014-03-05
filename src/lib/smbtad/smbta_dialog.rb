@@ -29,14 +29,15 @@ module Smbtad
       dialog.run
     end
 
-    def initialize
-      # TODO
-    end
 
     def run
       return unless create_dialog
 
-      close_dialog
+      begin
+        return controller_loop
+      ensure
+        close_dialog
+      end
     end
 
   private
@@ -60,18 +61,28 @@ module Smbtad
       )
     end
 
+    def controller_loop
+      while true do
+        input = Yast::UI.UserInput
+        case input
+        when :ok, :cancel
+          return :ok
+        else
+          raise "Unknown action #{input}"
+        end
+      end
+    end
+
     def config_table
       Table(
-        Id(:config_table),
-        Opt(:multiSelection),
-        Header(_("Config"), _("Used")),
-        content
+        Header( "Foo", "Bar"),
+        [ Item( Id(1), "foo", "bar" )]
       )
     end
 
     def content
       Item(
-          "foo",
+          Id(1),
           "bar",
           "foobar"
         )
