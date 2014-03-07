@@ -50,23 +50,66 @@ module Smbtad
     def close_dialog
       Yast::UI.CloseDialog
     end
+    def tab_contents
+      HBox(Label("TEST TEST BLUBB BLABB"))
+    end
 
     def dialog_content
+      tab_labels = [
+                   Item(Id(:general_tab), _("&General Settings"), true),
+                   Item(Id(:network_tab), _("&Network Settings")),
+                   Item(Id(:database_tab), _("&Database Settings"))
+                   ]
       VBox(
         headings,
         HBox(
-          config_table
-        ),
-        ending_buttons
-      )
+            Left(DumbTab(Id(:tabs), tab_labels, ReplacePoint(Id(":tab_contents"), VBox(Empty()))))
+            ),
+
+         #config_table                      
+            Right(Bottom(generell_buttons))
+          )
+    end
+
+    def label_content(lcontent)
+       Label("#{lcontent} Settings for the SMBTAD.")
+    end
+
+    def general_page
+       HBox(label_content("General"), Empty(), 
+            HWeight( 10, IntField("Debug Level", 0, 10, 0)))
+    end
+
+    def network_page
+       label_content("Network")
+    end
+
+    def database_page
+       VBox(label_content("Database"),
+            InputField(Id(":dbuser"),"User:"),
+            Password(Id(":dbpassword"), "Password:"),
+            InputField(Id(":dbname"),"Databasename:"),
+            InputField(Id(":dbhost"), "Host:"),
+            InputField(Id(":inetport"), "Port:") 
+            
+            )
     end
 
     def controller_loop
       while true do
-        input = Yast::UI.UserInput
+       # input = Yast::UI.UserInput
+        input = Yast::UI.WaitForEvent["ID"]
+        #PUTS zu testzwecken
+        puts "#{input}"
         case input
-        when :ok, :cancel
+        when :ok, :cancel, :exit
           return :ok
+        when :general_tab
+          Yast::UI.ReplaceWidget(Id(":tab_contents"), general_page)
+        when :network_tab
+          Yast::UI.ReplaceWidget(Id(":tab_contents"), network_page)
+        when :database_tab
+          Yast::UI.ReplaceWidget(Id(":tab_contents"), database_page)
         else
           raise "Unknown action #{input}"
         end
@@ -89,11 +132,12 @@ module Smbtad
     end
 
     def headings
-      Heading(_("Test"))
+      Heading(_("SMBTAD - Configuration"))
     end
 
-    def ending_buttons
-      PushButton(Id(:ok), _("&Exit"))
+    def generell_buttons
+     # PushButton(Id(":save"), _("&Save")),
+      PushButton(Id(":exit"), _("&Exit"))      
     end
   end
 end
