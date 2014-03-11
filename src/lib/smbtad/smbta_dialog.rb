@@ -63,11 +63,10 @@ module Smbtad
       VBox(
         headings,
         HBox(
-            Left(DumbTab(Id(:tabs), tab_labels, ReplacePoint(Id(":tab_contents"), VBox(Empty()))))
+            Left(DumbTab(Id(:tabs), tab_labels, ReplacePoint(Id(":tab_contents"), VBox(general_page()))))
             ),
-
-         #config_table                      
-            Right(Bottom(generell_buttons))
+                      
+            Right(Bottom(HBox(save_button, generell_buttons)))
           )
     end
 
@@ -77,50 +76,59 @@ module Smbtad
 
     def general_page
        HBox(label_content("General"), Empty(), 
-            HWeight( 10, IntField("Debug Level", 0, 10, 0)))
+            VBox(HSquash(IntField("Debug Level", 0, 10, 0))))
     end
 
     def network_page
-       label_content("Network")
+       VBox(Empty(),
+            label_content("Network"),
+            CheckBox(Id(":cb_use_udsocket"), "Unix Domain Socket?"),
+            ReplacePoint(Id(":net_input1"), InputField(Id(":networkport"), "Networkport:")),
+            ReplacePoint(Id(":net_imput2"), InputField(Id(":queryport"), "Queryport:")),
+            PushButton(Id(":test"), "Anwenden")
+           )
     end
 
     def database_page
-       VBox(label_content("Database"),
-            InputField(Id(":dbuser"),"User:"),
+       VBox(Empty(),
+            label_content("Database"),
+            InputField(Id(":dbuser"),"User:", "postgres"),
             Password(Id(":dbpassword"), "Password:"),
-            InputField(Id(":dbname"),"Databasename:"),
-            InputField(Id(":dbhost"), "Host:"),
-            InputField(Id(":inetport"), "Port:") 
+            InputField(Id(":dbname"),"Databasename:", "smbtad"),
+            InputField(Id(":dbhost"), "Host:", "localhost"),
+            InputField(Id(":inetport"), "Port:"),
+            ComboBox(Id(":dbdriver"), "Select DB Driver", ["pgsql","mysql","sqlite3"])
             
             )
     end
 
     def controller_loop
-      while true do
-       # input = Yast::UI.UserInput
-        input = Yast::UI.WaitForEvent["ID"]
+      while true do        
+        input = Yast::UI.WaitForEvent
+        #cb_value = Convert.to_boolean(UI::Querywidget(Id(":cb_use_udsocket"), :Value))
+        #puts "#{cb_value}"
         #PUTS zu testzwecken
         puts "#{input}"
-        case input
+        case input["ID"]
         when :ok, :cancel, :exit
           return :ok
+        when :save
+          return :save
         when :general_tab
           Yast::UI.ReplaceWidget(Id(":tab_contents"), general_page)
         when :network_tab
           Yast::UI.ReplaceWidget(Id(":tab_contents"), network_page)
         when :database_tab
           Yast::UI.ReplaceWidget(Id(":tab_contents"), database_page)
+#        when :test
+#          if cb_value == true
+#            Yast::UI.ReplaceWidget(Id(":net_input1"), Label("--"))
+#            Yast::UI.ReplaceWidget(Id(":net_input2"), Label("--"))
+#          end
         else
           raise "Unknown action #{input}"
         end
       end
-    end
-
-    def config_table
-      Table(
-        Header( "Foo", "Bar"),
-        [ Item( Id(1), "foo", "bar" )]
-      )
     end
 
     def content
@@ -134,9 +142,12 @@ module Smbtad
     def headings
       Heading(_("SMBTAD - Configuration"))
     end
+    
+    def save_button
+      PushButton(Id(":save"), _("&Save"))
+    end
 
     def generell_buttons
-     # PushButton(Id(":save"), _("&Save")),
       PushButton(Id(":exit"), _("&Exit"))      
     end
   end
