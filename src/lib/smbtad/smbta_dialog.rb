@@ -23,6 +23,9 @@ module Smbtad
 
     include Yast::UIShortcuts
     include Yast::I18n
+    @wd = {"LabelNetwork" => {"widget" => ":label_network", "label" => "Network Settings"},
+           "UDS" => {"widget" => :custom, "custom_widget" => Frame( "SMBTAD Network Configuration", Left(CheckBox(Id(:cb)), "test"))}                    
+          }
 
     def self.run
       Yast.import "UI"
@@ -82,12 +85,15 @@ module Smbtad
             TimeField(Id(:interval), "Interval", "01:00:00")))))
     end
 
-    def network_page(cb_status = true)
+    def network_page
        VBox(Empty(),
             label_content("Network"),
-            CheckBox(Id(":cb"), _("Unix Domain Socket?"), cb_status),
+            CheckBox(Id(":cb"), _("Unix Domain Socket?"), true),
             InputField(Id(":networkport"), "Networkport:"),
-            InputField(Id(":queryport"), "Queryport:")
+            InputField(Id(":queryport"), "Queryport:"),
+            widget_descr = Builtins.union(
+            Ops.get(@wd, "LabelNetwork", {})
+           )
            )
     end
 
@@ -111,15 +117,15 @@ module Smbtad
         cb_status = Yast::UI.QueryWidget(Id(":cb"), :Value)
 
         if cb_status == true
-#          Yast::UI.ChangeWidget(Id(":networkport"), :Enabled, false)
-#          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, false)
+          Yast::UI.ChangeWidget(Id(":networkport"), :Enabled, false)
+          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, false)
         else
-#          Yast::UI.ChangeWidget(Id(:networkport), :Enabled, true)
-#          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, true)
+          Yast::UI.ChangeWidget(Id(:networkport), :Enabled, true)
+          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, true)
         end
 
         input = Yast::UI.WaitForEvent
-        
+        puts "#{cb_status}"
         puts "#{input}"
         case input["ID"]
         when :ok, :cancel, :exit
@@ -129,7 +135,7 @@ module Smbtad
         when :general_tab
           Yast::UI.ReplaceWidget(Id(":tab_contents"), general_page)
         when :network_tab
-          Yast::UI.ReplaceWidget(Id(":tab_contents"), (network_page(:cb_status)))
+          Yast::UI.ReplaceWidget(Id(":tab_contents"), network_page)
         when :database_tab
           Yast::UI.ReplaceWidget(Id(":tab_contents"), database_page)
         else
