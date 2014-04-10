@@ -17,15 +17,24 @@
 #  you may find current contact information at www.suse.com
 
 require "yast"
+require "smbtad/smbta_conf_reader"
 
 module Smbtad
   class SmbtadDialog
 
+   
     include Yast::UIShortcuts
     include Yast::I18n
-    @wd = {"LabelNetwork" => {"widget" => ":label_network", "label" => "Network Settings"},
-           "UDS" => {"widget" => :custom, "custom_widget" => Frame( "SMBTAD Network Configuration", Left(CheckBox(Id(:cb)), "test"))}                    
-          }
+    
+    $parser = INIConfigParser.new
+    $coha = $parser.get_conf_hash
+    
+#    $coha_old = $coha
+    
+
+#    @wd = {"LabelNetwork" => {"widget" => ":label_network", "label" => "Network Settings"},
+#           "UDS" => {"widget" => :custom, "custom_widget" => Frame( "SMBTAD Network Configuration", Left(CheckBox(Id(":cb"), "TEST")))}                    
+#          }
 
     def self.run
       Yast.import "UI"
@@ -74,69 +83,101 @@ module Smbtad
           )
     end
     
-
-    def label_content(lcontent)
-       Label("#{lcontent} Settings for the SMBTAD.")
-    end
-    
     def general_page
-            VBox(HBox(label_content("General"), Empty(), 
-            Left(VBox(HSquash(IntField("Debug Level", 0, 10, 0)), Empty(), 
-            TimeField(Id(:interval), "Interval", "01:00:00")))))
+            VBox(VSpacing(0.5),
+            Frame("General Settings", HBox( Empty(), 
+            Left(HBox(HSquash(IntField(Id(:debug_level), "Debug Level", 0, 10, $coha['general']['debug_level'])), Empty(), HSpacing(3.0), 
+            TimeField(Id(:interval), "Interval", $coha['maintenance']['interval'])
+            )))))
     end
 
     def network_page
-       VBox(Empty(),
-            label_content("Network"),
-            CheckBox(Id(":cb"), _("Unix Domain Socket?"), true),
-            InputField(Id(":networkport"), "Networkport:"),
-            InputField(Id(":queryport"), "Queryport:"),
-            widget_descr = Builtins.union(
-            Ops.get(@wd, "LabelNetwork", {})
-           )
-           )
+       VBox(VSpacing(0.5),
+            Frame("Network Settings", HBox(
+            CheckBox(Id(:cb), _("Unix Domain Socket?"), true),
+            InputField(Id(:networkport), "Networkport:", $coha['network']['port_number'].to_s),
+            InputField(Id(:queryport), "Queryport:", $coha['network']['query_port'].to_s)
+           )))
+           
     end
 
     def database_page
-       VBox(Empty(),
-            label_content("Database"),
-            InputField(Id(":dbuser"),"User:", "postgres"),
-            Password(Id(":dbpassword"), "Password:"),
-            InputField(Id(":dbname"),"Databasename:", "smbtad"),
-            InputField(Id(":dbhost"), "Host:", "localhost"),
-            InputField(Id(":inetport"), "Port:"),
-            InputField(Id(":ip_adress"), "IP:"),
-            ComboBox(Id(":dbdriver"), "Select DB Driver", ["pgsql","mysql","sqlite3"]) 
-            )
+
+       if $coha['database']['driver'] == "pgsql"
+         driver_items = [Item("pgsql", true), Item("mysql"), Item("sqlite3")]
+       elsif $coha['database']['driver'] == "mysql"
+         driver_items = [Item("pgsql"), Item("mysql", true), Item("sqlite3")]
+       elsif $coha['database']['driver'] == "sqlite3"
+         driver_items = [Item("pgsql"), Item("mysql"), Item("sqlite3", true)]
+       end
+       VBox(VSpacing(0.5),
+            Frame("Database Settings", HBox(
+            Empty(),
+            InputField(Id(:dbuser),"User:", $coha['database']['user']),
+            Password(Id(:password), "Password:", $coha['database']['password']),
+            InputField(Id(:dbname),"Databasename:", $coha['database']['name']),
+            InputField(Id(:host), "Host:", $coha['database']['host']),
+            ComboBox(Id(:driver), "Select DB Driver", driver_items) 
+            )))
+            
+           
+    end
+
+    def update_hash(ptab)
+
+      if ptab.to_s == "database_tab"
+        #database        
+        $coha["database"]['user'] = Yast::UI.QueryWidget(Id(:dbuser), :Value).to_s
+        $coha["database"]['password'] = Yast::UI.QueryWidget(Id(:password), :Value).to_s
+        $coha["database"]['name'] = Yast::UI.QueryWidget(Id(:dbname), :Value).to_s
+        $coha["database"]['host'] = Yast::UI.QueryWidget(Id(:host), :Value).to_s
+
+      #  puts "#{$coha['database']['driver']}"
+        $coha["database"]['driver'] = Yast::UI.QueryWidget(Id(:driver), :Value).to_s
+        puts "#{$coha['database']['driver']}"
+
+      elsif ptab.to_s == "network_tab"
+        #network
+        puts "#{Yast::UI.QueryWidget(Id(:cb), :Value)}"
+        $coha["network"]["port_number"] = Yast::UI.QueryWidget(Id(:networkport), :Value)
+        $coha["network"]["query_port"] = Yast::UI.QueryWidget(Id(:queryport), :Value)
+
+      elsif ptab.to_s == "general_tab"
+        #general
+        $coha['general']['debug_level'] = Yast::UI.QueryWidget(Id(:debug_level), :Value)
+        $coha['general']['interval'] = Yast::UI.QueryWidget(Id(:interval), :Value)
+      end
+      #generell
+      
     end
 
     def controller_loop
-      cb_status = true
+
       while true do
 
-        cb_status = Yast::UI.QueryWidget(Id(":cb"), :Value)
+ #         Yast::UI.ChangeWidget(Id(":networkport"), :Enabled, false)
+ #         Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, false)
+ #         Yast::UI.ChangeWidget(Id(:networkport), :Enabled, true)
+ #         Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, true)
+ 
+        prev_tab = Yast::UI.QueryWidget(Id(:tabs), :CurrentItem)
+        input = Yast::UI.UserInput
+        current_tab = Yast::UI.QueryWidget(Id(:tabs), :CurrentItem)
 
-        if cb_status == true
-          Yast::UI.ChangeWidget(Id(":networkport"), :Enabled, false)
-          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, false)
-        else
-          Yast::UI.ChangeWidget(Id(:networkport), :Enabled, true)
-          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, true)
-        end
-
-        input = Yast::UI.WaitForEvent
-        puts "#{cb_status}"
-        puts "#{input}"
-        case input["ID"]
-        when :ok, :cancel, :exit
+        case input
+        when :exit
           return :ok
         when :save
-          #Speichern der einstellungen
+          update_hash(current_tab)
+          $parser.write_conf($coha) 
         when :general_tab
+          update_hash(prev_tab)
           Yast::UI.ReplaceWidget(Id(":tab_contents"), general_page)
         when :network_tab
+          update_hash(prev_tab)
           Yast::UI.ReplaceWidget(Id(":tab_contents"), network_page)
         when :database_tab
+          update_hash(prev_tab)
           Yast::UI.ReplaceWidget(Id(":tab_contents"), database_page)
         else
           raise "Unknown action #{input}"
@@ -149,11 +190,11 @@ module Smbtad
     end
     
     def save_button
-      PushButton(Id(":save"), _("&Save"))
+      PushButton(Id(:save), _("&Save"))
     end
 
     def generell_buttons
-      PushButton(Id(":exit"), _("&Exit"))      
+      PushButton(Id(:exit), _("&Exit"))      
     end
   end
 end
