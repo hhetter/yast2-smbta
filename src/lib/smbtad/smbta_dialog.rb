@@ -63,9 +63,6 @@ module Smbtad
     def close_dialog
       Yast::UI.CloseDialog
     end
-    def tab_contents
-      HBox(Label("TEST TEST BLUBB BLABB"))
-    end
 
     def dialog_content
       tab_labels = [
@@ -79,7 +76,7 @@ module Smbtad
             Left(DumbTab(Id(:tabs), tab_labels, ReplacePoint(Id(":tab_contents"), VBox(general_page()))))
             ),
                       
-            Right(Bottom(HBox(save_button, generell_buttons)))
+            Right(Bottom(HBox(help_button, save_button, generell_buttons)))
           )
     end
     
@@ -111,7 +108,7 @@ module Smbtad
          driver_items = [Item("pgsql"), Item("mysql"), Item("sqlite3", true)]
        end
        VBox(VSpacing(0.5),
-            Frame("Database Settings", HBox(
+            Frame("Database Settings", VBox(
             Empty(),
             InputField(Id(:dbuser),"User:", $coha['database']['user']),
             Password(Id(:password), "Password:", $coha['database']['password']),
@@ -125,7 +122,14 @@ module Smbtad
 
     def update_hash(ptab)
 
+      #Funktion die den Hash mit den aktuell eingetragen Werten aktualisiert
+      #um diesen dann in der Config-Datei zu speichern.
+      #Übergeben wird der der vorherige Tab um die Werte temporär zu speichern
+      #Damit die Werte in den InputFields vorhanden bleibt auch beim umschalten auf
+      #einen anderen Tab
+
       if ptab.to_s == "database_tab"
+
         #database        
         $coha["database"]['user'] = Yast::UI.QueryWidget(Id(:dbuser), :Value).to_s
         $coha["database"]['password'] = Yast::UI.QueryWidget(Id(:password), :Value).to_s
@@ -137,11 +141,19 @@ module Smbtad
         puts "#{$coha['database']['driver']}"
 
       elsif ptab.to_s == "network_tab"
+
         #network
         puts "#{Yast::UI.QueryWidget(Id(:cb), :Value)}"
+        if Yast::UI.QueryWidget(Id(:cb), :Value) == false
+          $coha['network']['unix_domain_socket'] = 'no'
+
+        elsif Yast::UI.QueryWidget(Id(:cb), :Value) == true
+          $coha['network']['unix_domain_socket'] = 'yes'
+
+        end
         $coha["network"]["port_number"] = Yast::UI.QueryWidget(Id(:networkport), :Value)
         $coha["network"]["query_port"] = Yast::UI.QueryWidget(Id(:queryport), :Value)
-
+        
       elsif ptab.to_s == "general_tab"
         #general
         $coha['general']['debug_level'] = Yast::UI.QueryWidget(Id(:debug_level), :Value)
@@ -154,12 +166,15 @@ module Smbtad
     def controller_loop
 
       while true do
+        
+        if $coha['network']['unix_domain_socket'] == 'yes'
+          Yast::UI.ChangeWidget(Id(":networkport"), :Enabled, false)
+          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, false)
+        elsif $coha['network']['unix_domain_socket'] == 'no'
+          Yast::UI.ChangeWidget(Id(:networkport), :Enabled, true)
+          Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, true)
+        end
 
- #         Yast::UI.ChangeWidget(Id(":networkport"), :Enabled, false)
- #         Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, false)
- #         Yast::UI.ChangeWidget(Id(:networkport), :Enabled, true)
- #         Yast::UI.ChangeWidget(Id(":queryport"), :Enabled, true)
- 
         prev_tab = Yast::UI.QueryWidget(Id(:tabs), :CurrentItem)
         input = Yast::UI.UserInput
         current_tab = Yast::UI.QueryWidget(Id(:tabs), :CurrentItem)
@@ -169,7 +184,9 @@ module Smbtad
           return :ok
         when :save
           update_hash(current_tab)
-          $parser.write_conf($coha) 
+          $parser.write_conf($coha)
+        when :help_b
+          exec("firefox http://wiki.samba.org/index.php/SMBTA") 
         when :general_tab
           update_hash(prev_tab)
           Yast::UI.ReplaceWidget(Id(":tab_contents"), general_page)
@@ -195,6 +212,10 @@ module Smbtad
 
     def generell_buttons
       PushButton(Id(:exit), _("&Exit"))      
+    end
+
+    def help_button
+      PushButton(Id(:help_b), _("&Help"))
     end
   end
 end
